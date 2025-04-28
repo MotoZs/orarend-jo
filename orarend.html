@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <title>Órarend</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background-color: lightblue; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 3px solid black; padding: 8px; text-align: center; background-color: lightblue; min-width: 100px; }
+    th { background-color: coral; }
+    td:hover { background-color: yellow; }
+    button { width: 80px; }
+    button:hover { font-weight: bold; background-color: green; }
+    input, select, button { margin: 5px; padding: 5px; }
+    #tor:hover{background-color: red;}
+  </style>
+</head>
+<body>
+  <h1>Órarend</h1>
+
+  <div>
+    <select id="nap">
+      <option value="Hétfő">Hétfő</option>
+      <option value="Kedd">Kedd</option>
+      <option value="Szerda">Szerda</option>
+      <option value="Csütörtök">Csütörtök</option>
+      <option value="Péntek">Péntek</option>
+    </select>
+    <input type="number" id="ora" placeholder="Óra" min="1" max="8">
+    <input type="text" id="tantargy" placeholder="Tantárgy">
+    <button onclick="hozzaadOra()">Hozzáadás</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Óra</th>
+        <th>Hétfő</th>
+        <th>Kedd</th>
+        <th>Szerda</th>
+        <th>Csütörtök</th>
+        <th>Péntek</th>
+      </tr>
+    </thead>
+    <tbody id="orarend-tbody"></tbody>
+  </table>
+
+  <script>
+    const apiUrl = 'http://localhost:3000/orarend';
+
+    async function lekerOrarend() {
+      const res = await fetch(apiUrl);
+      const adatok = await res.json();
+      megjelenitOrarend(adatok);
+    }
+
+    function megjelenitOrarend(lista) {
+      const tbody = document.getElementById('orarend-tbody');
+      tbody.innerHTML = '';
+
+      const napok = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
+      const orarendMatrix = {};
+
+      lista.forEach(ora => {
+        if (!orarendMatrix[ora.ora]) {
+          orarendMatrix[ora.ora] = {};
+        }
+        orarendMatrix[ora.ora][ora.nap] = ora.tantargy;
+      });
+
+      const maxOra = Math.max(...lista.map(o => o.ora), 8);
+
+      for (let oraSzam = 1; oraSzam <= maxOra; oraSzam++) {
+        const sor = document.createElement('tr');
+        sor.innerHTML = `<td>${oraSzam}</td>`;
+
+        napok.forEach(nap => {
+          const tantargy = orarendMatrix[oraSzam]?.[nap] || '';
+          const cellaTartalom = tantargy 
+            ? `<div ondblclick="modositCellat('${nap}', ${oraSzam}, '${tantargy}')">
+                 ${tantargy}
+                 <button onclick="torolCellat('${nap}', ${oraSzam})" style="margin-top:5px;" id="tor">Törlés</button>
+               </div>`
+            : '';
+
+          sor.innerHTML += `<td>${cellaTartalom}</td>`;
+        });
+
+        tbody.appendChild(sor);
+      }
+    }
+
+    async function hozzaadOra() {
+      const nap = document.getElementById('nap').value;
+      const ora = parseInt(document.getElementById('ora').value);
+      const tantargy = document.getElementById('tantargy').value;
+
+      if (!nap || !ora || !tantargy) return alert('Minden mezőt ki kell tölteni!');
+
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nap, ora, tantargy })
+      });
+
+      lekerOrarend();
+    }
+
+    async function modositCellat(nap, ora, regiTantargy) {
+      const ujTantargy = prompt('Adj meg egy új tantárgyat:', regiTantargy);
+      if (ujTantargy === null) return;
+
+      await fetch(apiUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nap, ora, tantargy: ujTantargy })
+      });
+
+      lekerOrarend();
+    }
+
+    async function torolCellat(nap, ora) {
+      if (!confirm('Biztosan törölni szeretnéd ezt az órát?')) return;
+
+      await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nap, ora })
+      });
+
+      lekerOrarend();
+    }
+
+    window.onload = () => {
+      lekerOrarend();
+    };
+  </script>
+</body>
+</html>
